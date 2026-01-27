@@ -39,18 +39,27 @@ void main(void){
     
     // Preciso de um modo para armazenar as medidas anteriores para montar as condições corretas de mudança de estado.
     // Por enquanto vou utilizar simples structs.
-    float memory_accel_z[3], memory_bar[3];
-    int i = 0;
+    float memory_accel_z[3], memory_bar[6], average_pressure[2];
+    int cycles_1 = 0, cycles_2 = 0;
     while(1) { // Loop principal do controlador
         SensorData data = read_sensors(); // Struct recebe as leituras
                                           // Estou consierando que essa leitura ocorre a cada 0,1s
-        memory_accel_z[i%3] = data.accel_z;
+        memory_accel_z[cycles_1%6] = data.accel_z;
+        memory_bar[cycles_1%3] = data.pressure;
+        if(current_state == STATE_COASTING){
+            if(cycles_2 == 0) {
+                // average_pressure[0] sempre será a média mais antiga
+                average_pressure[0] = (memory_bar[0] + memory_bar[1] + memory_bar[2])/3;
+                average_pressure[1] = (memory_bar[3] + memory_bar[4] + memory_bar[5])/3;
+            }
+            else average_pressure[1] = (memory_bar[3] + memory_bar[4] + memory_bar[5])/3;
+        }
         switch (current_state){
         
             case STATE_STANDBY:
                 int flag_powered_flight = 0;
                 for(int j = 0; j < 3; j++){
-                    if(memory_accel_z[j] > 2) flag_powered_flight =1;
+                    if(memory_accel_z[j] > 2) flag_powered_flight = 1;
                     else flag_powered_flight = 0;
                 }
                 if(flag_powered_flight == 1) current_state = STATE_POWERED_FLIGHT;
@@ -59,7 +68,7 @@ void main(void){
             case STATE_POWERED_FLIGHT:
                 int flag_coasting = 0;
                 for(int j = 0; j < 3; j++){
-                    // Acho que não preciso me preocupar com medidas (ruídos) positivos aqui
+                    // Acho que não preciso me preocupar com medidas (ruídos) positivas aqui
                     // Caso eu precise, preciso trocar para um método de comparação de médias.
                     if(memory_accel_z[j] < 0) flag_coasting = 1;
                     else flag_coasting = 0;
@@ -68,8 +77,18 @@ void main(void){
                 break;
 
             case STATE_COASTING:
-
+                // O sinal para passar para o próximo estado (apogeu), é accel_z = 0 e a menor pressão.
+                // O problema é que essas duas medidas são sensíveis e, portanto, são facilmente interferidas por ruídos.
+                int flag_null_accel = 0;
+                if(data.accel_z == 0) flag_null_accel = 1;
+                if(average_pressure[0] < average_pressure[1] && flag_null_accel == 1) current_state = STATE_APOGEE;
+                // Passar os memory_bar[3], [4] e [5], respectivamente para [0], [1] e [2], para manter average_pressure[0] como a mais antiga
+                for(int j = 0; j < 3; j++) {memory_bar[j] = memory_bar[j+3];}
                 break;
+            
+            case STATE_APOGEE:
+                
         }
+        cycles_1++;
     }
 }
