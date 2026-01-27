@@ -28,6 +28,7 @@ typedef struct {
 // read_sensors();
 // start_engine();
 // start_recovery();
+// max_height();
 
 // Variáveis Globais de Controle
 FlightState current_state = STATE_STANDBY;
@@ -44,8 +45,8 @@ void main(void){
     while(1) { // Loop principal do controlador
         SensorData data = read_sensors(); // Struct recebe as leituras
                                           // Estou consierando que essa leitura ocorre a cada 0,1s
-        memory_accel_z[cycles_1%6] = data.accel_z;
-        memory_bar[cycles_1%3] = data.pressure;
+        memory_accel_z[cycles_1%3] = data.accel_z;
+        memory_bar[cycles_1%6] = data.pressure;
         if(current_state == STATE_COASTING){
             if(cycles_2 == 0) {
                 // average_pressure[0] sempre será a média mais antiga
@@ -59,10 +60,10 @@ void main(void){
             case STATE_STANDBY:
                 int flag_powered_flight = 0;
                 for(int j = 0; j < 3; j++){
-                    if(memory_accel_z[j] > 2) flag_powered_flight = 1;
+                    if(memory_accel_z[j] > 2) flag_powered_flight++;
                     else flag_powered_flight = 0;
                 }
-                if(flag_powered_flight == 1) current_state = STATE_POWERED_FLIGHT;
+                if(flag_powered_flight == 3) current_state = STATE_POWERED_FLIGHT;
                 break;
             
             case STATE_POWERED_FLIGHT:
@@ -80,14 +81,23 @@ void main(void){
                 // O sinal para passar para o próximo estado (apogeu), é accel_z = 0 e a menor pressão.
                 // O problema é que essas duas medidas são sensíveis e, portanto, são facilmente interferidas por ruídos.
                 int flag_null_accel = 0;
-                if(data.accel_z == 0) flag_null_accel = 1;
-                if(average_pressure[0] < average_pressure[1] && flag_null_accel == 1) current_state = STATE_APOGEE;
+                if(data.accel_z > -0.1 && data.accel_z < 0.1) flag_null_accel = 1;
+                if(average_pressure[0] < average_pressure[1] && flag_null_accel == 1) {
+                    current_state = STATE_APOGEE;
+                    break; // Já sai do case e armazena as 6 últimas medidas de pressão para estimar a altura máxima
+                }
                 // Passar os memory_bar[3], [4] e [5], respectivamente para [0], [1] e [2], para manter average_pressure[0] como a mais antiga
                 for(int j = 0; j < 3; j++) {memory_bar[j] = memory_bar[j+3];}
+                cycles_2++;
                 break;
             
             case STATE_APOGEE:
-                
+                max_height();
+                current_state = STATE_RECOVERY;
+                break;
+
+            case STATE_RECOVERY:
+                start_recovery();
         }
         cycles_1++;
     }
