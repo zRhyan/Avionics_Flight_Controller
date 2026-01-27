@@ -40,13 +40,16 @@ void main(void){
     
     // Preciso de um modo para armazenar as medidas anteriores para montar as condições corretas de mudança de estado.
     // Por enquanto vou utilizar simples structs.
-    float memory_accel_z[3], memory_bar[6], average_pressure[2];
+    float memory_accel_z[3] = {0}, memory_bar[6] = {0}, average_pressure[2] = {0};
     int cycles_1 = 0, cycles_2 = 0;
     while(1) { // Loop principal do controlador
         SensorData data = read_sensors(); // Struct recebe as leituras
                                           // Estou consierando que essa leitura ocorre a cada 0,1s
         memory_accel_z[cycles_1%3] = data.accel_z;
-        memory_bar[cycles_1%6] = data.pressure;
+        
+        if(cycles_2 < 3) memory_bar[cycles_2%3] = data.pressure; // Apenas [0], [1] e [2]
+        else memory_bar[cycles_2%3 + 3] = data.pressure;         // Apenas [3], [4] e [5]
+        
         if(current_state == STATE_COASTING){
             if(cycles_2 == 0) {
                 // average_pressure[0] sempre será a média mais antiga
@@ -71,10 +74,10 @@ void main(void){
                 for(int j = 0; j < 3; j++){
                     // Acho que não preciso me preocupar com medidas (ruídos) positivas aqui
                     // Caso eu precise, preciso trocar para um método de comparação de médias.
-                    if(memory_accel_z[j] < 0) flag_coasting = 1;
+                    if(memory_accel_z[j] < 0) flag_coasting++;
                     else flag_coasting = 0;
                 }
-                if(flag_coasting == 1) current_state = STATE_COASTING;
+                if(flag_coasting == 3) current_state = STATE_COASTING;
                 break;
 
             case STATE_COASTING:
