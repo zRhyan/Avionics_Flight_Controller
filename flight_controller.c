@@ -7,7 +7,7 @@
 // ==========================================
 //           CONSTANTES E CONFIGURAÇÕES
 // ==========================================
-#define DT 0.1f // Intervalo de tempo entre leituras (100ms)
+#define DT 0.02f // Intervalo de tempo entre leituras (20ms)
 
 // ==========================================
 //           DEFINIÇÃO DOS ESTADOS
@@ -79,6 +79,9 @@ void main(void){
 
         memory_accel_z[cycles_1%3] = data.accel_z;
         memory_alt[1] = data.altitude; 
+
+        float flag_positive_velocity = 0;
+        float flag_negative_velocity = 0;
 
         switch (current_state){
         
@@ -165,9 +168,7 @@ void main(void){
                 // 3. Filtro adaptativo (Baseado na última variação válida)
                 delta_H_adapt = const_2 * last_delta_H + const_3;
 
-                // 4. Híbrido: Escolhe o maior limite permitido (sendo conservador ou agressivo dependendo da sintonia)
-                // Aqui mantive sua lógica: se o físico permitir mais que o adaptativo, usa o adaptativo? 
-                // Ou o contrário? Mantive sua lógica original: "se fisico > adapt, limite = adapt"
+                // 4. Híbrido: sistema se adpta até onde a física permite
                 if(delta_H_phy > delta_H_adapt) delta_H_limit = delta_H_adapt;
 
                 // 5. Validação da Leitura (Gating)
@@ -186,6 +187,10 @@ void main(void){
                 
                 // Atualização da velocidade estimada para o próximo ciclo (opcional, mas bom para consistência)
                 current_velocity = velocity_decay;
+
+                if(current_velocity > 0,001 && current_velocity < 5) flag_positive_velocity++;
+                if(flag_positive_velocity >= 3 && current_velocity < 0 && current_velocity > -5) flag_negative_velocity++;
+                if(flag_negative_velocity >= 3){current_state = STATE_APOGEE;}
 
                 K++;
                 break;
