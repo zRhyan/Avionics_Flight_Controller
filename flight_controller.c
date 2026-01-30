@@ -71,6 +71,10 @@ void main(void){
     float delta_H_min_1 = 0.5f; // Mínimo deslocamento físico considerado no voo motorizado
     float delta_H_min_2 = 0.1f; // Mínimo deslocamento físico no coasting
 
+    // Flags
+    float flag_positive_velocity = 0;
+    float flag_negative_velocity = 0;
+
     while(1) { // Loop principal do controlador
         SensorData data = read_sensors(); 
         
@@ -79,9 +83,6 @@ void main(void){
 
         memory_accel_z[cycles_1%3] = data.accel_z;
         memory_alt[1] = data.altitude; 
-
-        float flag_positive_velocity = 0;
-        float flag_negative_velocity = 0;
 
         switch (current_state){
         
@@ -185,10 +186,10 @@ void main(void){
                     memory_alt[0] += delta_H_limit; 
                 }
                 
-                // Atualização da velocidade estimada para o próximo ciclo (opcional, mas bom para consistência)
-                current_velocity = velocity_decay;
+                // Atualização da velocidade estimada para o próximo ciclo 
+                current_velocity -= 9.81f * DT;
 
-                if(current_velocity > 0,001 && current_velocity < 5) flag_positive_velocity++;
+                if(current_velocity > 0.001 && current_velocity < 5) flag_positive_velocity++;
                 if(flag_positive_velocity >= 3 && current_velocity < 0 && current_velocity > -5) flag_negative_velocity++;
                 if(flag_negative_velocity >= 3){current_state = STATE_APOGEE;}
 
