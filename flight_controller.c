@@ -56,7 +56,7 @@ void main(void){
     // Variáveis de Memória e Controle
     // memory_alt[0] = Altitude Anterior (Validada)
     // memory_alt[1] = Altitude Atual (Lida do sensor/Estimada)
-    float memory_accel_z[3] = {0}, memory_alt[2] = {0}, last_delta_H = 0;
+    float memory_accel_z[3] = {0}, memory_alt[2] = {0}, last_delta_H = 0, signed_delta_H = 0;
     
     // Variáveis de Física
     float current_velocity = 0.0f; // Velocidade vertical estimada
@@ -72,8 +72,7 @@ void main(void){
     float delta_H_min_2 = 0.1f; // Mínimo deslocamento físico no coasting
 
     // Flags
-    float flag_positive_velocity = 0;
-    float flag_negative_velocity = 0;
+    int count_descent = 0;
 
     while(1) { // Loop principal do controlador
         SensorData data = read_sensors(); 
@@ -177,21 +176,23 @@ void main(void){
                 if(fabs(memory_alt[1] - memory_alt[0]) <= delta_H_limit) {
                     // Dado Válido: Aceita a leitura do sensor
                     last_delta_H = fabs(memory_alt[1] - memory_alt[0]);
+                    signed_delta_H = memory_alt[1] - memory_alt[0];
                     memory_alt[0] = memory_alt[1];
                 }
                 else {
                     // Dado Inválido (Ruído): Projeta a altitude usando o limite calculado
                     // Como estamos subindo, somamos o limite à altitude anterior
                     last_delta_H = delta_H_limit;
+                    signed_delta_H = delta_H_limit;
                     memory_alt[0] += delta_H_limit; 
                 }
                 
                 // Atualização da velocidade estimada para o próximo ciclo 
                 current_velocity -= 9.81f * DT;
 
-                if(current_velocity > 0.001 && current_velocity < 5) flag_positive_velocity++;
-                if(flag_positive_velocity >= 3 && current_velocity < 0 && current_velocity > -5) flag_negative_velocity++;
-                if(flag_negative_velocity >= 3){current_state = STATE_APOGEE;}
+                // Detecção do apogeu
+                if(signed_delta_H < 0) count_descent++;
+                if(count_descent >= 2) current_state = STATE_APOGEE;
 
                 K++;
                 break;
