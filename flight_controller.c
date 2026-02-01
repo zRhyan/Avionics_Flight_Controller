@@ -161,17 +161,17 @@ void main(void){
                 float velocity_decay = initial_coasting_velocity * exp(-(K * DT) / const_1);
                 delta_H_phy = velocity_decay * DT; 
 
-                // Garante um mínimo para não zerar totalmente
-                if(delta_H_phy < delta_H_min_2) delta_H_limit = delta_H_min_2;
-                else delta_H_limit = delta_H_phy;
-
                 // 3. Filtro adaptativo (Baseado na última variação válida)
                 delta_H_adapt = const_2 * last_delta_H + const_3;
 
                 // 4. Híbrido: sistema se adpta até onde a física permite
                 if(delta_H_phy > delta_H_adapt) delta_H_limit = delta_H_adapt;
+                else delta_H_limit = delta_H_phy; 
 
-                // 5. Validação da Leitura (Gating)
+                // 6. Garante um mínimo para não zerar totalmente
+                if(delta_H_limit < delta_H_min_2) delta_H_limit = delta_H_min_2;
+
+                // 7. Validação da Leitura (Gating)
                 // memory_alt[1] é o dado novo (sujo), memory_alt[0] é o validado
                 if(fabs(memory_alt[1] - memory_alt[0]) <= delta_H_limit) {
                     // Dado Válido: Aceita a leitura do sensor
@@ -192,6 +192,7 @@ void main(void){
 
                 // Detecção do apogeu
                 if(signed_delta_H < 0) count_descent++;
+                else count_descent = 0;
                 if(count_descent >= 2) current_state = STATE_APOGEE;
 
                 K++;
